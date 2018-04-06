@@ -1,0 +1,14 @@
+{
+  "name": "creative-slack-reminders",
+  "version": "1.0.0",
+  "description": "remind us in slack when airtable tasks are due",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "airtable": "^0.5.2"
+  }
+}
