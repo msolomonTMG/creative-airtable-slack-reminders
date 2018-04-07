@@ -5,6 +5,13 @@ const request = require('request')
 const Airtable = require('airtable')
 const base = new Airtable({apiKey: process.env.AIRTABLE_API_KEY}).base(process.env.AIRTABLE_BASE_ID)
 
+var dayOfWeek = new Date().getDay();
+var isWeekend = (dayOfWeek == 6) || (dayOfWeek == 0); // 6 = Saturday, 0 = Sunday
+
+if (isWeekend) {
+  return false // do not run this on the weekends
+}
+
 let slackAttachments = []
 
 base(process.env.AIRTABLE_TABLE_NAME).select({
