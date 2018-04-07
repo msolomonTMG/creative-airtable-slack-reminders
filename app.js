@@ -1,4 +1,4 @@
-const moment = require('moment')
+const utils = require('./utils')
 const request = require('request')
 const Airtable = require('airtable')
 const base = new Airtable({apiKey: process.env.AIRTABLE_API_KEY}).base(process.env.AIRTABLE_BASE_ID)
@@ -15,79 +15,45 @@ base(process.env.AIRTABLE_TABLE_NAME).select({
     tasks.forEach(function(task, index) {
       
       let taskName = task.get('Name')
-      let taskDueDate = moment(new Date(task.get('Due Date')).setHours(0,0,0,0)).add(1, 'day') // no idea why we need to add a day
-      let today = moment(new Date().setHours(0,0,0,0))
-      let color = ''
+    
+      let color = utils.setColor(task)
+      let project = utils.getProjects(task)
+      let people = utils.getPeople(task)
       
-      // set color to red if past due
-      // set color to orange if today
-      // leave color as default if in the future
-      if (taskDueDate < today) {
-        color = 'danger'
-      } else if (taskDueDate.isSame(today)) {
-        color = 'warning'
-      } else {
-        color = 'success'
-      }
-      
-      let slackAttachment = {
-        color: color,
-        fields: [
-          {
-            title: 'Due Date',
-            value: task.get('Due Date'),
-            short: true
-          },
-          {
-            title: 'Task',
-            value: task.get('Name'),
-            short: true
-          }
-        ]
-      }
-            
-      if (task.get('Project').length > 0) {
-        base('Projects').find(task.get('Project'), function(err, project) {
-          if (err) { console.log(err); return; }
-          slackAttachment.fields.push({
-            title: 'Project',
-            value: project.get('Name'),
-            short: true
-          })
-          
-          if (task.get('People').length > 0) {
-            base('People').find(task.get('People'), function(err, people) {
-              if (err) { console.log(err); return; }
-              slackAttachment.fields.push({
-                title: 'People',
-                value: people.get('Name'),
-                short: true
-              })
-              slackAttachments.push(slackAttachment)
-            })
-          } else {
-            slackAttachments.push(slackAttachment)
-          }
-        })
-      } else {
-        if (task.get('People').length > 0) {
-          base('People').find(task.get('People'), function(err, people) {
-            if (err) { console.log(err); return; }
-            slackAttachment.fields.push({
-              title: 'People',
-              value: people.get('Name'),
+      Promise.all([color, project, people]).then(values => {
+        let color = values[0],
+            project = values[1],
+            people = values[2];
+        
+        let slackAttachment = {
+          color: color,
+          fields: [
+            {
+              title: 'Task',
+              value: task.get('Name'),
               short: true
-            })
-            slackAttachments.push(slackAttachment)
-          })
-        } else {
-          slackAttachments.push(slackAttachment)
+            },
+            {
+              title: 'Project',
+              value: project,
+              short: true
+            },
+            {
+              title: 'Due Date',
+              value: task.get('Due Date'),
+              short: true
+            },
+            {
+              title: 'People',
+              value: people,
+              short: true
+            }
+          ]
         }
-      }
-      
-      // wait 3s because project.get('Name') takes a while
-      // then send tasks to slack
-      setTimeout(function() {
+        
+        slackAttachments.push(slackAttachment)
+        
+        // if this is the last task, send to slack
         if (index + 1 == tasks.length) {
           slackAttachments.sort(compare)
           console.log(slackAttachments)
@@ -107,10 +73,8 @@ base(process.env.AIRTABLE_TABLE_NAME).select({
             console.log(body)
           })
         }
-      }, 3000)
-
-      
-    });
+      })      
+    })
 
     // To fetch the next page of records, call `fetchNextPage`.
     // If there are more records, `page` will get called again.
@@ -124,9 +88,9 @@ base(process.env.AIRTABLE_TABLE_NAME).select({
 
 
 function compare(a, b) {
-  if (a.fields[0].value < b.fields[0].value)
+  if (a.fields[2].value < b.fields[2].value)
     return -1;
-  if (a.fields[0].value > b.fields[0].value)
+  if (a.fields[2].value > b.fields[2].value)
     return 1;
   return 0;
 }
